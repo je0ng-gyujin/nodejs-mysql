@@ -4,6 +4,15 @@ const url = require('url');
 const qs = require('querystring');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
+const mysql = require('mysql');
+
+const db = mysql.createConnection({
+  host     : 'localhost',
+  user     : 'nodejs',
+  password : '#jit120425',
+  database : 'nodetutorials'
+});
+db.connect();
 
 const template = require('./lib/template.js');
 
@@ -17,32 +26,31 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
   let pathname = url.parse(currentUrl, true).pathname;
   if(pathname == '/') { // 1-1. if문 > url:/의 페이지 출력
     if(queryData.id == undefined){ // 2-1. if문 > 쿼리스트링이 비어있는 홈페이지 출력
-      fs.readdir('./data', function(error, filelist) {        
+      db.query('SELECT * FROM topic', function(error1, results1) {
+        if (error1) { throw error1; }
         let title = 'Welcome';
         let data = 'Hello, Node.js';
-        let writelist = template.list(filelist);
-        let html = template.html(title, writelist, 
-          `<h2>${title}</h2>${data}`, 
+        let writelist = template.list(results1);
+        let html = template.html(title, writelist,
+          `<h2>${title}</h2>${data}`,
           '<a href="/create">create</a>');
         response.writeHead(200);
         response.end(html);
       });
-    } else {
-      fs.readdir('./data', function(error1, filelist) { // 2-2. if문 > 쿼리스트링이 있는 ./data 글 출력
-        let filteredId = path.parse(queryData.id).base;
-        fs.readFile(`./data/${filteredId}`, 'utf8', function(error2, data) {
-          let title = queryData.id;
-          let sanitizedTitle = sanitizeHtml(title);
-          let sanitizedDescription = sanitizeHtml(data);
-          let writelist = template.list(filelist);
-          let html = template.html(sanitizedTitle, writelist, 
-            `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`, 
-            `<a href="/create">create</a>
-             <a href="/update?id=${sanitizedTitle}">update</a>
-             <form action="delete_process" method="post">
-              <input type="hidden" name="id" value="${sanitizedTitle}">
-              <input type="submit" name="submit" value="delete">
-             </form>`);
+    } else { // 2-2. if문 > 쿼리스트링이 있는 id column 글 출력
+      db.query(`SELECT id, title FROM topic`, function(error1, listQuery) { // 글 목록 생성
+        if (error1) { throw error1; }
+        let titleList = template.list(listQuery);
+        db.query(`SELECT * FROM topic WHERE id=${queryData.id}`, function(error2, dataQuery) { // 본문을 생성 후 html 렌더링
+          if (error2) { throw error2; }
+          let html = template.html(dataQuery[0].title, titleList, 
+          `<h2>${dataQuery[0].title}</h2>${dataQuery[0].description}`,
+         `<a href="/create">create</a>
+          <a href="/update?id=${dataQuery[0].id}">update</a>
+          <form action="delete_process" method="post">
+            <input type="hidden" name="id" value="${dataQuery[0].id}">
+            <input type="submit" name="submit" value="delete">
+          </form>`)
           response.writeHead(200);
           response.end(html);
         });
