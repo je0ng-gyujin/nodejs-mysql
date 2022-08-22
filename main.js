@@ -3,7 +3,6 @@ const fs = require('fs');
 const url = require('url');
 const qs = require('querystring');
 const path = require('path');
-const sanitizeHtml = require('sanitize-html');
 const mysql = require('mysql');
 
 const db = mysql.createConnection({
@@ -26,7 +25,7 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
   let pathname = url.parse(currentUrl, true).pathname;
   if(pathname == '/') { // 1-1. if문 > url:/의 페이지 출력
     if(queryData.id == undefined){ // 2-1. if문 > 쿼리스트링이 비어있는 홈페이지 출력
-      db.query('SELECT * FROM topic', function(error1, results1) {
+      db.query('SELECT id, title FROM topic', function(error1, results1) {
         if (error1) { throw error1; }
         let title = 'Welcome';
         let data = 'Hello, Node.js';
@@ -57,15 +56,19 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
       });
     }
   } else if(pathname == '/create') { // 1-2. if문 > 글 생성 form 페이지
-    fs.readdir('./data', function(error, filelist) {
-      title = 'Web - Create';
-      writelist = template.list(filelist);
-      html = template.html(title, writelist, 
-      `<form action="/create_process" method="post">
-        <p><input type="text" placeholder="제목을 입력해주세요" name="title"></p>
-        <p><textarea placeholder="내용을 입력해주세요" name="description"></textarea></p>
-        <p><input type="submit"></p>
-      </form>`, '');
+    db.query('SELECT id, title FROM topic', function(error1, results1) {
+      if (error1) { throw error1; }
+      let title = 'Create';
+      let data = `
+        <form action="/create_process" method="post">
+          <p><input type="text" placeholder="제목을 입력해주세요" name="title"></p>
+          <p><textarea placeholder="내용을 입력해주세요" name="description"></textarea></p>
+          <p><input type="submit"></p>
+        </form>`;
+      let writelist = template.list(results1);
+      let html = template.html(title, writelist,
+        `<h2>${title}</h2>${data}`,
+        '');
       response.writeHead(200);
       response.end(html);
     });
@@ -75,10 +78,12 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
       body += data;
     });
     request.on('end', function() {
-      let title = qs.parse(body).title;
-      let description = qs.parse(body).description;
-      fs.writeFile(`./data/${title}`, description, 'utf8', function(error) {
-        response.writeHead(302, {Location: `/?id=${title}`});
+      let post = qs.parse(body);
+      db.query(`INSERT INTO topic (title, description, created, author_id)
+      VALUE (?, ?, NOW(), ?)`, [post.title, post.description, 1],
+      function(error, results) {
+        if(error) { throw error; }
+        response.writeHead(302, {Location: `/?id=${results.insertId}`});
         response.end();
       });
     });
