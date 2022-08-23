@@ -40,7 +40,7 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
       db.query(`SELECT id, title FROM topic`, function(error1, listQuery) { // 글 목록 생성
         if (error1) { throw error1; }
         let titleList = template.list(listQuery);
-        db.query(`SELECT * FROM topic WHERE id=${queryData.id}`, function(error2, dataQuery) { // 본문을 생성 후 html 렌더링
+        db.query(`SELECT * FROM topic WHERE id=?`, [queryData.id], function(error2, dataQuery) { // 본문을 생성 후 html 렌더링
           if (error2) { throw error2; }
           let html = template.html(dataQuery[0].title, titleList, 
           `<h2>${dataQuery[0].title}</h2>${dataQuery[0].description}`,
@@ -88,52 +88,54 @@ let app = http.createServer( (request, response) => {  // 서버 생성 초입
       });
     });
   } else if(pathname == '/update') { // 1-4. if문 > 글 수정 form 페이지
-    fs.readdir('./data', function(error1, filelist) { // 2-2. if문 > 쿼리스트링이 있는 ./data 글 출력
-      let filteredId = path.parse(queryData.id).base;
-      fs.readFile(`./data/${filteredId}`, 'utf8', function(error2, data) {
-        let title = queryData.id;
-        let writelist = template.list(filelist);
-        let html = template.html(title, writelist, 
-          `<form action="/update_process" method="post">
-            <input type="hidden" value="${title}" name="id">
-            <p><input type="text" value="${title}" name="title"></p>
-            <p><textarea placeholder="내용을 입력해주세요" name="description">${data}</textarea></p>
-            <p><input type="submit"></p>
-          </form>`, '');
+    db.query('SELECT id, title FROM topic', function(error1, results1) {
+      if (error1) { throw error1; }
+      let writelist = template.list(results1);
+      db.query('SELECT * FROM topic WHERE id=?', [queryData.id], function(error2, results2) {
+        if (error2) { throw error2; } 
+        let html = template.html(results2.title, writelist,
+       `<form action="/update_process" method="post">
+         <input type="hidden" value="${results2[0].id}" name="id">
+         <p><input type="text" value="${results2[0].title}" name="title"></p>
+         <p><textarea placeholder="내용을 입력해주세요" name="description">${results2[0].description}</textarea></p>
+         <p><input type="submit"></p>
+        </form>`, '');
         response.writeHead(200);
         response.end(html);
       });
     });
-  } else if(pathname == '/update_process') { // 1-4. if문 > 글 수정 post 처리페이지
+  } else if(pathname == '/update_process') { // 1-5. if문 > 글 수정 post 처리페이지
     let body = '';
     request.on('data', function(data) {
       body += data;
     });
     request.on('end', function() {
-      let id = qs.parse(body).id;
-      let title = qs.parse(body).title;
-      let description = qs.parse(body).description;
-      fs.rename(`./data/${id}`, `./data/${title}`, function(error) {
-        fs.writeFile(`./data/${title}`, description, 'utf8', function(error) {
-          response.writeHead(302, {Location : `/?id=${title}`});
-          response.end();
-        });
-      });
-    });
-  } else if(pathname == '/delete_process') { // 1-5. if문 > 글 삭제 post 처리페이지
-    let body = '';
-    request.on('data', function(data) {
-      body += data;
-    });
-    request.on('end', function() {
-      let id = qs.parse(body).id;
-      filteredId = path.parse(id).base;
-      fs.unlink(`./data/${filteredId}`, function(error){
-        response.writeHead(302, {Location: `/`});
+      let post = qs.parse(body);
+      db.query('UPDATE topic SET title=?, description=? WHERE id=?', 
+      [post.title, post.description, post.id], function(error, results) {
+        if (error) { throw error; }
+        response.writeHead(302, {Location : `/?id=${post.id}`});
         response.end();
       });
     });
-  } else { // 1-4. if문 > url:not found 404의 페이지 출력
+  } else if(pathname == '/delete_process') { // 1-6. if문 > 글 삭제 post 처리페이지
+    let body = '';
+    request.on('data', function(data) {
+      body += data;
+    });
+    request.on('end', function() {
+      db.query('DELETE FROM topic WHERE id=?', [qs.parse(body).id], function(error, results) {
+        if (error) { throw error; }
+        response.writeHead(302, {Location: `/`});
+        response.end();
+      });
+      // filteredId = path.parse(id).base;
+      // fs.unlink(`./data/${filteredId}`, function(error){
+      //   response.writeHead(302, {Location: `/`});
+      //   response.end();
+      // });
+    });
+  } else { // 1-7. if문 > url:not found 404의 페이지 출력
     response.statusCode = 404;
     response.setHeader('Content-Type', 'text/plain');
     response.end('Not found..');

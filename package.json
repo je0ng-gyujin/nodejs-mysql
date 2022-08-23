@@ -1,7 +1,7 @@
 {
   "name": "nodejs",
   "version": "1.0.0",
-  "description": "",
+  "description": "nodejs and mysql practice",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -9,7 +9,19 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "html-sanitize": "^1.1.5",
     "mysql": "^2.18.1",
     "sanitize-html": "^2.7.1"
-  }
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/je0ng-gyujin/nodejs-mysql.git"
+  },
+  "bugs": {
+    "url": "https://github.com/je0ng-gyujin/nodejs-mysql/issues"
+  },
+  "homepage": "https://github.com/je0ng-gyujin/nodejs-mysql#readme"
 }
